@@ -172,7 +172,8 @@ namespace Temporalio.Worker
                             WorkflowStackTrace: WorkflowStackTrace.None,
                             OnTaskStarting: options.OnTaskStarting,
                             OnTaskCompleted: options.OnTaskCompleted,
-                            RuntimeMetricMeter: new(() => runtime.MetricMeter)),
+                            RuntimeMetricMeter: new(() => runtime.MetricMeter),
+                            WorkflowTaskMiddlewarePipeline: new()),
                         (runId, removeFromCache) => SetResult(removeFromCache));
                 }
                 catch

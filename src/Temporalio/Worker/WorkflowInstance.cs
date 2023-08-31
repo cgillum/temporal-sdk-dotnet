@@ -61,6 +61,7 @@ namespace Temporalio.Worker
         private readonly ReplaySafeLogger replaySafeLogger;
         private readonly Action<WorkflowInstance> onTaskStarting;
         private readonly Action<WorkflowInstance, Exception?> onTaskCompleted;
+        private readonly WorkflowTaskMiddlewarePipeline workflowTaskMiddlewarePipeline;
         private WorkflowActivationCompletion? completion;
         // Will be set to null after last use (i.e. when workflow actually started)
         private Lazy<object?[]>? startArgs;
@@ -169,6 +170,7 @@ namespace Temporalio.Worker
             replaySafeLogger = new(logger);
             onTaskStarting = details.OnTaskStarting;
             onTaskCompleted = details.OnTaskCompleted;
+            workflowTaskMiddlewarePipeline = details.WorkflowTaskMiddlewarePipeline;
             Random = new(details.Start.RandomnessSeed);
             TracingEventsEnabled = !details.DisableTracingEvents;
         }
@@ -466,7 +468,7 @@ namespace Temporalio.Worker
         }
 
         /// <inheritdoc/>
-        public WorkflowActivationCompletion Activate(WorkflowActivation act)
+        public async Task<WorkflowActivationCompletion> ActivateAsync(WorkflowActivation act)
         {
             using (logger.BeginScope(Info.LoggerScope))
             {
@@ -485,24 +487,34 @@ namespace Temporalio.Worker
                 Exception? failureException = null;
                 try
                 {
-                    var previousContext = SynchronizationContext.Current;
-                    try
+                    // Wrap the workflow activation inside a middleware pipeline so that developers can
+                    // add custom middleware to the activation process. Note that the middleware executes
+                    // outside of the workflow context. The final step of the pipeline invokes the workflow
+                    // execution path.
+                    WorkflowTaskMiddlewareContext middlewareContext = new(Info, Definition);
+                    await workflowTaskMiddlewarePipeline.RunAsync(middlewareContext, handler: _ =>
                     {
-                        // We must set the sync context to null so work isn't posted there
-                        SynchronizationContext.SetSynchronizationContext(null);
-                        // We can trust jobs are deterministically ordered by core
-                        foreach (var job in act.Jobs)
+                        var previousContext = SynchronizationContext.Current;
+                        try
                         {
-                            Apply(job);
-                            // Run scheduler once. Do not check conditions when patching or querying.
-                            var checkConditions = job.NotifyHasPatch == null && job.QueryWorkflow == null;
-                            RunOnce(checkConditions);
+                            // We must set the sync context to null so work isn't posted there
+                            SynchronizationContext.SetSynchronizationContext(null);
+                            // We can trust jobs are deterministically ordered by core
+                            foreach (var job in act.Jobs)
+                            {
+                                Apply(job);
+                                // Run scheduler once. Do not check conditions when patching or querying.
+                                var checkConditions = job.NotifyHasPatch == null && job.QueryWorkflow == null;
+                                RunOnce(checkConditions);
+                            }
                         }
-                    }
-                    finally
-                    {
-                        SynchronizationContext.SetSynchronizationContext(previousContext);
-                    }
+                        finally
+                        {
+                            SynchronizationContext.SetSynchronizationContext(previousContext);
+                        }
+
+                        return Task.CompletedTask;
+                    }).ConfigureAwait(false);
                 }
                 catch (Exception e)
                 {
