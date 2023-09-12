@@ -150,11 +150,9 @@ namespace Temporalio.Worker
                     // TODO(cretz): Since deadlocks can cause unreclaimed threads, we are setting
                     // LongRunning here. That means they may oversubscribe and create a new thread
                     // just for this, is that ok?
-                    var workflowTask = Task.Factory.StartNew(
-                        () => workflow.Activate(act),
-                        default,
-                        TaskCreationOptions.LongRunning | TaskCreationOptions.DenyChildAttach | TaskCreationOptions.PreferFairness,
-                        TaskScheduler.Current);
+                    // REVIEW: Switched from Task.Factory.StartNew to Task.Run since the former doesn't support
+                    //         async callbacks. Also: https://blog.stephencleary.com/2013/08/startnew-is-dangerous.html
+                    Task<WorkflowActivationCompletion> workflowTask = Task.Run(() => workflow.ActivateAsync(act));
                     using (var timeoutCancel = new CancellationTokenSource())
                     {
                         // We create a delay task to catch any deadlock timeouts, and if it didn't
@@ -282,6 +280,7 @@ namespace Temporalio.Worker
                     WorkflowStackTrace: options.WorkflowStackTrace,
                     OnTaskStarting: options.OnTaskStarting,
                     OnTaskCompleted: options.OnTaskCompleted,
+                    WorkflowTaskMiddlewarePipeline: options.WorkflowTaskMiddlewarePipeline,
                     RuntimeMetricMeter: options.RuntimeMetricMeter));
         }
     }

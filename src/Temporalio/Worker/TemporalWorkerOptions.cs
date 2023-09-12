@@ -20,6 +20,8 @@ namespace Temporalio.Worker
         internal static readonly Func<WorkflowInstanceDetails, IWorkflowInstance> DefaultWorkflowInstanceFactory =
             details => new WorkflowInstance(details);
 
+        private readonly WorkflowTaskMiddlewarePipeline workflowTaskMiddlewarePipeline = new();
+
         private IList<ActivityDefinition> activities = new List<ActivityDefinition>();
         private IList<WorkflowDefinition> workflows = new List<WorkflowDefinition>();
 
@@ -247,6 +249,11 @@ namespace Temporalio.Worker
             DefaultWorkflowInstanceFactory;
 
         /// <summary>
+        /// Gets the middleware pipeline for workflow task activation.
+        /// </summary>
+        internal WorkflowTaskMiddlewarePipeline WorkflowTaskMiddlewarePipeline => workflowTaskMiddlewarePipeline;
+
+        /// <summary>
         /// Add the given delegate with <see cref="ActivityAttribute" /> as an activity. This is
         /// usually a method reference.
         /// </summary>
@@ -321,6 +328,15 @@ namespace Temporalio.Worker
         }
 
         /// <summary>
+        /// Adds a middleware handler to the activation execution pipeline.
+        /// </summary>
+        /// <param name="middleware">Handler to invoke whenever a workflow activation is executed.</param>
+        public void AddActivationMiddleware(Func<WorkflowTaskMiddlewareContext, Func<Task>, Task> middleware)
+        {
+            workflowTaskMiddlewarePipeline.Add(middleware ?? throw new ArgumentNullException(nameof(middleware)));
+        }
+
+        /// <summary>
         /// Create a shallow copy of these options.
         /// </summary>
         /// <returns>A shallow copy of these options and any transitive options fields.
@@ -330,6 +346,7 @@ namespace Temporalio.Worker
             var options = (TemporalWorkerOptions)MemberwiseClone();
             options.activities = new List<ActivityDefinition>(Activities);
             options.workflows = new List<WorkflowDefinition>(Workflows);
+            // TODO(cgillum): Clone the middleware pipeline.
             return options;
         }
 

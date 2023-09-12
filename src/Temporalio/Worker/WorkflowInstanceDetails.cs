@@ -24,6 +24,7 @@ namespace Temporalio.Worker
     /// <param name="WorkflowStackTrace">Option for workflow stack trace.</param>
     /// <param name="OnTaskStarting">Callback for every instance task start.</param>
     /// <param name="OnTaskCompleted">Callback for every instance task complete.</param>
+    /// <param name="WorkflowTaskMiddlewarePipeline">Middleware pipeline for workflow task execution.</param>
     /// <param name="RuntimeMetricMeter">Lazy runtime-level metric meter.</param>
     internal record WorkflowInstanceDetails(
         string Namespace,
@@ -39,5 +40,6 @@ namespace Temporalio.Worker
         WorkflowStackTrace WorkflowStackTrace,
         Action<WorkflowInstance> OnTaskStarting,
         Action<WorkflowInstance, Exception?> OnTaskCompleted,
+        WorkflowTaskMiddlewarePipeline WorkflowTaskMiddlewarePipeline,
         Lazy<IMetricMeter> RuntimeMetricMeter);
 }

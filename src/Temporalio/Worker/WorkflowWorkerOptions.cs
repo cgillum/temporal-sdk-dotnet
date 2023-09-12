@@ -20,5 +20,6 @@ namespace Temporalio.Worker
         WorkflowStackTrace WorkflowStackTrace,
         Action<WorkflowInstance> OnTaskStarting,
         Action<WorkflowInstance, Exception?> OnTaskCompleted,
-        Lazy<IMetricMeter> RuntimeMetricMeter);
+        Lazy<IMetricMeter> RuntimeMetricMeter,
+        WorkflowTaskMiddlewarePipeline WorkflowTaskMiddlewarePipeline);
 }
